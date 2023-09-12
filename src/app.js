@@ -49,10 +49,6 @@ const Message = require('./dao/models/messages')
 //Import transformDataProducts
 const {transformDataChat } = require('./utils/transformdata')
 
-// Mocks
-const mocksRoute = require('./routes/mocks.js')
-app.use('/api/mocks', mocksRoute)
-
 
 //Socket Import
 const { Server } = require('socket.io')

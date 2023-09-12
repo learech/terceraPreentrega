@@ -1,5 +1,3 @@
-//Primera Pre Entrega - Andrade Matias
-
 const fs = require('fs');
 class ProductManagerInCart {
 
