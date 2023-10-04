@@ -4,43 +4,40 @@ socket.on('Welcome', (data) => {
     console.log(data)
 })
 
-
-
-
 async function captureValueId() {
     let select = document.getElementById("options");
     const pid = select.value;
-    console.log(`Try delete product ${pid}`)
+    console.log(`Intentando eliminar el producto ${pid}`)
     try {
         const resDeleted = await fetch(`/api/products/${pid}`, {
             method: 'DELETE'
         });
-        if (!resDeleted.ok) throw new Error('Failed to delete product');
-
+        const resDeletedData = await resDeleted.json()
+        if (!resDeletedData.ok) {
+            throw new Error(resDeletedData.msg); 
+        }
         const resGetProducts = await fetch('/api/allProducts', {
             method: 'GET'
         });
-        if (!resGetProducts.ok) throw new Error('Failed to get products');
 
+        if (!resGetProducts.ok) {
+            throw new Error('Error al obtener los productos'); 
+        }
         const productsData = await resGetProducts.json();
-
         let htmlProducts = productsData.map(obj => `<p class="text-center products"> ${obj.title}</p>`).join(' ');
         document.getElementById('products').innerHTML = htmlProducts;
-
         let htmlProductsInMenu = productsData.map(obj => `<option value="${obj.id}">${obj.title}</option>`).join(' ');
         document.getElementById('options').innerHTML = htmlProductsInMenu;
-        console.log(`Product deleted ${pid}`)
+        console.log(resDeletedData.msg + `${pid}`)
     } catch (error) {
-        console.log(error);
+        console.log(error.message);
     }
 }
-
 
 async function handlesubmit(event) {
     event.preventDefault()
     const form = document.getElementById('formAddProduct')
     const inputTrue = document.getElementById('newProductStatusTrue')
-
     let valueInputRadio;
 
     if (inputTrue.checked) {
@@ -48,7 +45,6 @@ async function handlesubmit(event) {
     } else {
         valueInputRadio = false
     }
-
     const product = {
         title: form.inputProductTitle.value,
         description: form.inputProductDescription.value,
@@ -59,7 +55,6 @@ async function handlesubmit(event) {
         category: form.inputProductCategory.value,
         thumbnail: "file" //form.inputFile.files[0]
     }
-
     try {
         const resCreated = await fetch("/api/products", {
             method: 'POST',
@@ -68,7 +63,11 @@ async function handlesubmit(event) {
             },
             body: JSON.stringify(product)
         });
-        if (!resCreated.ok) throw new Error('Failed to create product');
+
+        if (!resCreated.ok) {
+            const errorResponse = await resCreated.json();
+            throw new Error(errorResponse.error || 'Failed to create product');
+        }
 
         const resGetProducts = await fetch('/api/allProducts', {
             method: 'GET'
@@ -90,6 +89,12 @@ async function handlesubmit(event) {
         }, 3000)
     } catch (error) {
         console.log(error);
+        const errorMessage = error.message || 'Error desconocido';
+        const message = document.getElementById('message');
+        message.textContent = errorMessage;
+        setTimeout(() => {
+            message.textContent = '';
+        }, 3000);
     }
 }
 
@@ -113,19 +118,21 @@ function loadCart() {
 
 
 
-async function captureValueIdProduct(pid) {
+async function captureValueIdProduct(pid, title) {
     let cartID = document.querySelector('#userEmail').getAttribute('data-cartid');
-    console.log(`Trying to add product to Cart: ${cartID}`);
+    console.log(`Trying to add product to Cart: ${title}`);
     const quantity = 1;
     try {
-        const res = await fetch(`/api/carts/${cartID}/products/${pid}`, {
+        const resAddProduct = await fetch(`/api/carts/${cartID}/products/${pid}`, {
             method: 'PUT',
             headers: { 'Content-type': 'application/json; charset=utf-8' },
             body: JSON.stringify({ quantity: quantity })
         });
-        if (!res.ok) throw res;
-    } catch (e) {
-        console.log(e);
+        const resAddProductData = await resAddProduct.json()
+        if (!resAddProductData.ok) throw new Error(resAddProductData.msg); 
+        console.log(resAddProductData.msg)
+    } catch (error) {
+        console.log(error.message);
     }
 }
 
@@ -176,7 +183,6 @@ function deleteAllProductCart(pid) {
     document.getElementById("boxProductsCart").innerHTML = htmlProductsInCart;
 }
 
-
 function purchaseCart() {
     let cartID = document.querySelector('#userEmail').getAttribute('data-cartid');
     console.log(`Trying finish Cart : ${cartID}`);
@@ -190,7 +196,6 @@ function purchaseCart() {
             return response.json();
         })
         .then(data => {
-            console.log(data);
             if (data.error) {
                 throw new Error(data.error);
             }
@@ -200,12 +205,13 @@ function purchaseCart() {
                 document.getElementById("boxProductsCart").innerHTML = htmlProductsInCart;
             } else {
                 let htmlProductsInCart = productsCart.map(obj => `<div ><h3 class="p-1">${obj.product.title} : Quantity - ${obj.quantity}</h3></div><input type="submit" class="mb-4 btn btn-danger" value="Delete" onclick="deleteProductCart('${obj.product._id}')"></input>`).join(' ');
-                document.getElementById("boxProductsCart").innerHTML = htmlProductsInCart;
-                const ticket = document.getElementById('ticket');
-                ticket.textContent = "Ticket:\n";
-                const ticketData = data[0];
-                ticket.innerHTML +=
-                    `<div class="ticket">
+                document.getElementById("boxProductsCart").innerHTML = htmlProductsInCart;    
+            }
+            const ticket = document.getElementById('ticket');
+            ticket.textContent = "Ticket:\n";
+            const ticketData = data[0];
+            ticket.innerHTML +=
+                `<div class="ticket">
                         <p class="line">Code: ${ticketData.code}</p>
                         <p class="line">Date: ${ticketData.purchaser_datetime}</p>
                         <p class="line">Amount: $${ticketData.amount}</p>
@@ -214,12 +220,10 @@ function purchaseCart() {
                     </div>`;
 
 
-                setTimeout(() => {
-                    ticket.textContent = "";
-                }, 10000);
-            }
+            setTimeout(() => {
+                ticket.textContent = "";
+            }, 10000);
         })
-
         .catch(error => console.error('Error:', error.message));
 }
 
