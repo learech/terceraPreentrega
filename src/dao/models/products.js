@@ -4,13 +4,12 @@ const mongoosePaginate = require('mongoose-paginate-v2');
 const productSchema = new mongoose.Schema({
     title: {
         type: String,
-        unique: true,
         required: true
     },
     description: {
         type: String,
         required: true,
-        maxlength:[10,'Limit characteres superate. Max 10']
+        
     },
     code: {
         type: String,
@@ -23,7 +22,8 @@ const productSchema = new mongoose.Schema({
     },
     status: {
         type: Boolean, 
-        required: true
+        required: true,
+        default: true
     },
     stock: {
         type: Number,
@@ -36,6 +36,10 @@ const productSchema = new mongoose.Schema({
     thumbnail: {
         type: String,
         required: true
+    },
+    owner: {
+        type: String,
+        default: 'admin'
     }
 }, {
     timestamps: true,

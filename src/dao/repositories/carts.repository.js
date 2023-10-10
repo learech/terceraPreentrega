@@ -5,6 +5,7 @@ const productsModel = require('../models/products')
 const usersModel = require('../models/users')
 const { transformDataCart } = require('../../utils/transformdata');
 const uuid = require('uuid');
+const User = require('../models/users')
 
 class CartsRepository {
     constructor() { }
@@ -12,21 +13,25 @@ class CartsRepository {
     async createCart(body) {
         const cartdto = new CartDTO(body);
         const newCart = await cartsModel.create(cartdto)
+        if (!newCart) return { status: 404, answer: 'Error trying to create cart' }
         return newCart;
     }
 
     async getCart() {
         const carts = await cartsModel.find()
-        return carts;
+        if (!carts) return { status: 404, answer: 'Error trying to find carts' };
+        return  { status: 200, answer: carts };
     }
 
     async getProductInCart(cid) {
         const cartSelectedPopulated = await cartsModel.findById(cid).populate('products.product')
+        if (!cartSelectedPopulated) return { status: 404, answer: 'Error trying to find cart' };
         return JSON.stringify(cartSelectedPopulated, null, '\t');
     }
     async getCartId(cid) {
         const cart = await cartsModel.findById(cid)
-        return cart;
+        if (!cart) return { ok: false, error: 'Error trying to find cart' };
+        return { ok: true, cart: cart  };
     }
 
     async getProductsInCartId(cid) {
@@ -36,55 +41,77 @@ class CartsRepository {
         return dataCartId;
     }
 
-    async productsInCart(cid, pid, quantity) {
-
+    async productsInCart(email, cid, pid, quantity) {
         const product = await productsModel.findById(pid);
-        const cart = await cartsModel.findById(cid);
-
-        const productInCartIndex = cart.products.findIndex(entry => entry.product.toString() === pid);
-
-        if (product) {
-            if (productInCartIndex !== -1) {
-                const existingQuantity = cart.products.find(entry => entry.product.toString() === pid)?.quantity || 0;
-                const totalQuantity = existingQuantity + quantity;
-
-                cart.products[productInCartIndex].quantity = totalQuantity;
-                await cart.save();
-                const cartUpdated = await cartsModel.findById(cid).populate('products.product');
-
-                return { status: 201, answer: JSON.stringify(cartUpdated, null, '\t') };
-            } else {
-                cart.products.push({ product: product._id, quantity: quantity });
-                await cart.save();
-                const cartUpdated = await cartsModel.findById(cid).populate('products.product');
-
-                return { status: 201, answer: JSON.stringify(cartUpdated, null, '\t') };
+        const productOwner = product.owner;
+        if (email !== productOwner) {
+            if (!product) {
+                return { ok: false, status: 404, msg: 'Error trying to find product' };
             }
+            const cart = await cartsModel.findById(cid);
+            if (!cart) {
+                return { ok: false, status: 404, msg: 'Error trying to find cart' };
+            }
+
+            const productInCartIndex = cart.products.findIndex(entry => entry.product.toString() === pid);
+
+            if (product) {
+                if (productInCartIndex !== -1) {
+                    const existingQuantity = cart.products.find(entry => entry.product.toString() === pid)?.quantity || 0;
+                    const totalQuantity = existingQuantity + quantity;
+                    cart.products[productInCartIndex].quantity = totalQuantity;
+                    await cart.save();
+                    const cartUpdated = await cartsModel.findById(cid).populate('products.product');
+                    if (!cartUpdated) {
+                        return { ok: false, status: 404, msg: 'Error trying to find cart' };
+                    }
+                    return { ok: true, status: 201, msg: `Product ${product.title} has been add in your cart`};
+                } else {
+                    cart.products.push({ product: product._id, quantity: quantity });
+                    await cart.save();
+                    const cartUpdated = await cartsModel.findById(cid).populate('products.product');
+                    if (!cartUpdated) {
+                        return { ok: false, status: 404, msg: 'Error trying to find cart' };
+                    }
+                    return { ok: true, status: 201, msg: JSON.stringify(cartUpdated, null, '\t') };
+                }
+            } else {
+                return { ok: false, status: 404, msg: 'Error trying to find product' };
+            }  
         } else {
-            return { status: 404, answer: 'Error trying to find product' };
+            return { ok: false, status: 404, msg: `Error, owner can not add product in his cart...` };
         }
+        
     }
 
 
     async deleteProductsCart(cid) {
         const cart = await cartsModel.findById(cid);
+        if (!cart) {
+            return { ok: false, error: 'Error trying to find cart' };
+        }
         if (cart.products.length > 0) {
             if (cart) {
                 cart.products.splice(0, cart.products.length);
                 await cart.save();
                 const cartUpdated = await cartsModel.findById(cid).populate('products.product')
-                return { status: 201, answer: cartUpdated };
+                if (!cartUpdated) {
+                    return { ok: false, error: 'Error trying to update' };
+                }
+                return { ok: true, answer: cartUpdated };
             } else {
-                return { status: 404, answer: 'Error try found cart or product' };
+                return { ok: false, error: 'Error try find cart' };
             }
         } else {
             const cartUpdated = await cartsModel.findById(cid).populate('products.product')
-            return { status: 404, error: 'Cart empty', answer: cartUpdated };
+            if (!cartUpdated) {
+                return { ok: false, error: 'Error try update cart' };
+            }
+            return { ok: false, error: 'This cart is empty', answer: cartUpdated };
         }
     }
 
     async deleteProductSelectedCart(cid, pid) {
-
         const product = await productsModel.findById(pid);
         const cart = await cartsModel.findById(cid);
 
@@ -165,6 +192,10 @@ class CartsRepository {
             amount: totalAmount,
             purchaser: user.email
         });
+
+        if (!ticket) {
+            throw new Error('Error trying create ticket');
+        }
 
         return [
             ticket,
